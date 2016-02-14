@@ -1,4 +1,3 @@
-
 import itertools
 
 class BasicLinearCode:
@@ -65,7 +64,7 @@ class BasicLinearCode:
 
   # returns the hamming distance between a received word and a codeword.
   def distance(self,word,codeword):
-    return sum(vector(QQ,word-codeword));
+    return sum([0 if (word[i]==codeword[i]) else 1 for i in range(0,len(word))]);
 
   # returns the decoded word using either mode="nearest" or mode="syndrome"
   def decode(self,word,mode="nearest"):
@@ -92,7 +91,10 @@ class BasicLinearCode:
       return word
     else:
       self.generate_syndromes()
-      return word-self._syndrome_dict[syndrome]
+      if syndrome in self._syndrome_dict:
+        return word-self._syndrome_dict[syndrome]
+      else:
+        return None
 
   # calculate syndrome for received message
   def get_syndrome(self,word):
