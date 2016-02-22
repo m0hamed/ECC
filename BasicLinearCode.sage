@@ -130,7 +130,7 @@ class BasicLinearCode:
           error = self.get_vector(permutation);
           syndrome = self.get_syndrome(error)
           if syndrome not in self._syndrome_dict:
-            print "syndrome table:", "{0:.2f}".format(float(len(self._syndrome_dict)/syndrome_dict_full_size)*100)," percent full\r", 
+            print "syndrome table:", "{0:.2f}".format(float(len(self._syndrome_dict)/syndrome_dict_full_size)*100)," percent full\r",
             self._syndrome_dict[syndrome] = error
           if len(self._syndrome_dict) == syndrome_dict_full_size:
             return
@@ -138,11 +138,11 @@ class BasicLinearCode:
           if not next_permutation(permutation):
             break
 
-  #generator for all unique lists of nerrors length in finite field, without zero values and ordered 
+  #generator for all unique lists of nerrors length in finite field, without zero values and ordered
   def error_permutations(self, nerrors, prevlists):
     if nerrors > 0:
       for prevlist in prevlists:
-        limit = (int(self._base_ring.last()) if len(prevlist) == 0 else prevlist[0]) 
+        limit = (int(self._base_ring.last()) if len(prevlist) == 0 else prevlist[0])
         for i in range(1, limit+1):
           yield [i] + prevlist
     else:
@@ -157,13 +157,13 @@ def next_permutation(arr):
       i -= 1
   if i <= 0:
       return False
-  
+
   # Find successor to pivot
   j = len(arr) - 1
   while arr[j] <= arr[i - 1]:
       j -= 1
   arr[i - 1], arr[j] = arr[j], arr[i - 1]
-  
+
   # Reverse suffix
   arr[i : ] = arr[len(arr) - 1 : i - 1 : -1]
   return True
@@ -184,9 +184,9 @@ def hamming(m):
       if not next_permutation(base):
         break
   A = matrix(GF(2),(gen_rows));
-  
+
   generator = matrix(GF(2),matrix.identity(rank).augment(A))
-  
+
   parity = A.transpose().augment(matrix.identity(length-rank))
 
   return (length,rank,generator,parity)
