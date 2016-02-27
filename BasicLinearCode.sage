@@ -148,33 +148,6 @@ class BasicLinearCode:
     else:
       yield []
 
-  # Querying of the singleton bound, provide d,n,k and get a true or false
-  # answer if it is possible or provide just two of them and get the value of
-  # the third
-  @staticmethod
-  def singleton_bound(**kwargs):
-    variables = ["d", "n", "k"]
-    values = map(kwargs.get, variables)
-    count_nones = sum([1 for x in values if x is None])
-    if count_nones > 1:
-      raise Exception, "Please leave at most only one variable undefined"
-    d, n, k = values
-    if count_nones == 0:
-      if d <= n-k+1:
-        print "A linear Code with length %i and dimension %i can have a distance %i within the singleton bound" % (n,k,d)
-        return True
-      else:
-        print "A linear Code with length %i and dimension %i can have a distance of at most %i within the singleton bound" % (n,k,n-k+1)
-        return False
-    if d is None:
-      print "A linear Code with length %i and dimension %i can have a distance of at most %i within the singleton bound" % (n,k,n-k+1)
-      return n-k+1
-    elif n is None:
-      print "A linear Code with dimension %i and minimum distance %i must have a length of at least %i within the singleton bound" % (k,d,d+k-1)
-      return d+k-1
-    elif k is None:
-      print "A linear Code with length %i and minimum distance %i can have a dimension of at most %i within the singleton bound" % (n,d,n-d+1)
-      return n-d+1
 
 #lexicographic permutation generation
 #https://www.nayuki.io/page/next-lexicographical-permutation-algorithm
