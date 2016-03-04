@@ -58,7 +58,7 @@ def plotkin_bound(pp=True, **kwargs):
 def griesmer_bound(pp=True, **kwargs):
   n, d, k, count_nones = get_ndk(kwargs)
   if count_nones == 0:
-    if n >= sum([ceil(d/2**i) for i in xrange(k-1)]):
+    if n >= sum([ceil(d/2**i) for i in xrange(k)]):
       if pp: print "A linear Code with length %i, dimension %i and maximum distance %i can exist within the griesmer bound" % (n,k,d)
       return True
     else:
@@ -69,7 +69,7 @@ def griesmer_bound(pp=True, **kwargs):
   elif k is None:
     raise Exception, "You can't query the griesmer bound on the parameter k"
   elif n is None:
-    min_n = sum([ceil(d/2**i) for i in xrange(k-1)])
+    min_n = sum([ceil(d/2**i) for i in xrange(k)])
     if pp: print "A linear Code with dimension %i and minimum distance %i must have a length of at least %i within the griesmer bound" % (k,d,min_n)
     return min_n
 
@@ -102,7 +102,7 @@ def gilbert_varshamov_bound(pp=True, **kwargs):
   if count_nones > 0:
     raise Exception, "Cannot query Gilbert Varshamov bound with an unknown"
 
-  if q^(n-k) > sum([binomial(n-1, j)*(q-1)^j for j in xrange(d-1)]) <= q^(n-k):
+  if q^(n-k) > sum([binomial(n-1, j)*(q-1)^j for j in xrange(d-1)]):
     if pp: print "A linear Code with length %i, dimension %i, field size %i and maximum distance %i can exist within the Gilbert Varshamov bound" % (n,k,q,d)
     return True
   else:
