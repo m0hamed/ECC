@@ -27,7 +27,6 @@ class ReedSolomonCode(BasicLinearCode):
     self._generator_matrix = matrix(F, V(self.alphas, k))
     self._parity_check_matrix = None
     self._gammas = None
-    self._lagrange_functions = None
 
   def _get_gammas(self):
     if (self._gammas is None):
@@ -77,37 +76,31 @@ class ReedSolomonCode(BasicLinearCode):
     #generate the syndrome polynomial
     PF.<x> = self._base_ring[]
     syndrome_polynomial = reduce(lambda z,y: z+y, [int(syndromes[self._t*2-1-i])*x^i for i in range(self._t*2)])
-    
     #run the extended euclidean algorithm between x^2t and the syndrome polynomial, up to the first iteration where the degree of the remainder is less than t
     eea_results = EEA(x^(2*self._t),syndrome_polynomial,self._t)
 
     #the positions of the errors are the roots of the lambda function, which is equal to g(x) (scaled)
-    error_positions = [x[0] for x in eea_results[2].roots()]
+    error_positions = [x[0] for x in eea_results.roots()]
+    correct_positions = set(range(self._length))-set(error_positions)
 
     #calculate the lagrange interpolation
-    lagrange_interpolation = 0
-    k = 0
-    # print self._get_lagrange_functions()
-    for i in range(self._length):
-      if i not in error_positions:
-        # print i,received_word[i], received_word[i]*self._get_lagrange_functions()[i]
-        lagrange_interpolation += received_word[i]*self._get_lagrange_functions()[i]
-        k += 1
-      if k == self._rank:
-        break
-  
-    return lagrange_interpolation
 
-  # returns the constituents of the lagrange interpolation
-  def _get_lagrange_functions(self):
-    if self._lagrange_functions is None:
-      PF.<x> = self._base_ring[]
-      self._lagrange_functions = [
-        self._get_gammas()[i]*reduce(
-          lambda z,y: z*y, [(x-self.alphas[j]) 
-          for j in range(self._length) if j!=i]
-          ) for i in range(self._length)]
-    return self._lagrange_functions
+    lagrange_interpolation = self._lagrange(correct_positions,received_word)
+    # print "lagrange:", lagrange_interpolation
+
+    if lagrange_interpolation.degree() >= self._rank:
+      return None
+    return lagrange_interpolation.list()
+
+  # returns the lagrange interpolation for the current received word and its correct positions 
+  def _lagrange(self, correct_positions, received_word):
+    PF.<x> = self._base_ring[]
+
+    return sum([
+      received_word[i]*reduce(
+        lambda z,y: z*y, [(x-self.alphas[j])/(self.alphas[i]-self.alphas[j]) 
+        for j in correct_positions if j!=i]
+        ) for i in correct_positions])
 
   # returns the syndromes of the received word
   def get_syndromes(self, received_word):
@@ -133,29 +126,31 @@ def V(alphas, rank):
   return [[x^i for x in alphas] for i in range(rank)]
 
 # returns the extended euclidean algorithm results ran up to the first iteration where the degree of the remainder is less than t
-# return value is a tuple: (ri, fi, gi)
+# return value is gi
 def EEA(a,b,t):
   if a.degree()<b.degree():
     a,b = b,a
-  M = matrix([[a,1,0],[b,0,1]])
+  M = matrix([[a,0],[b,1]])
 
-  while M[1,0] != 0 and t <= M[0,0].degree():
+  while M[1,0] != 0 and t <= M[1,0].degree():
     quo = M[0,0].quo_rem(M[1,0])[0]
     M = matrix([[0,1],[1,-quo]])*M
 
-  return M[0]
+  return M[1][1]
 
-# RS1 = ReedSolomonCode(7, 3, GF(7))
-# msg = vector(GF(7),[0,1,1])
-# cw = RS1.encode(msg)
-# error = vector(GF(7),[1,0,0,0,0,3,0])
-# received = cw + error
-# print received
-# print RS1.eval_encode(msg)
+RS1 = ReedSolomonCode(7, 3, GF(13))
+print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
+msg = vector(GF(13),[0,1,1])
+cw = RS1.encode(msg)
+error = vector(GF(13),[1,0,0,0,0,0,1])
+received = cw + error
+print received
+print RS1.eval_encode(msg)
 
-# print RS1.bw_decode(cw)
-# print "decode, no error:\n",RS1.eea_decode(cw)
-# print "decode, 1 error:\n",RS1.eea_decode(received)
+print "bw decode, no error:\n",RS1.bw_decode(cw)
+print "bw decode, error(s):\n",RS1.bw_decode(received)
+print "eea decode, no error:\n",RS1.eea_decode(cw)
+print "eea decode, error(s):\n",RS1.eea_decode(received)
 
 
 # F.<x> = GF(13)[]
