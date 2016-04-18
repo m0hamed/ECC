@@ -90,7 +90,7 @@ class ReedSolomonCode(BasicLinearCode):
 
     if lagrange_interpolation.degree() >= self._rank:
       return None
-    return lagrange_interpolation.list()
+    return vector(self._base_ring,lagrange_interpolation.list()+[0]*(self._rank-len(lagrange_interpolation.list())))
 
   # returns the lagrange interpolation for the current received word and its correct positions 
   def _lagrange(self, correct_positions, received_word):
@@ -138,28 +138,16 @@ def EEA(a,b,t):
 
   return M[1][1]
 
-RS1 = ReedSolomonCode(7, 3, GF(13))
-print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
-msg = vector(GF(13),[0,1,1])
-cw = RS1.encode(msg)
-error = vector(GF(13),[1,0,0,0,0,0,1])
-received = cw + error
-print received
-print RS1.eval_encode(msg)
+# RS1 = ReedSolomonCode(7, 3, GF(13))
+# print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
+# msg = vector(GF(13),[1,1,0])
+# cw = RS1.encode(msg)
+# error = vector(GF(13),[1,0,0,0,0,0,1])
+# received = cw + error
+# print received
+# print RS1.eval_encode(msg)
 
-print "bw decode, no error:\n",RS1.bw_decode(cw)
-print "bw decode, error(s):\n",RS1.bw_decode(received)
-print "eea decode, no error:\n",RS1.eea_decode(cw)
-print "eea decode, error(s):\n",RS1.eea_decode(received)
-
-
-# F.<x> = GF(13)[]
-# a = x^3+x^2-x+4
-# b = x^2+x+1
-# c = 6*x^3 + 5*x^2 + 9*x + 7
-
-# print "roots:",c.roots()
-# print "polynomials:",a,",",b
-# d,u,v = xgcd(a,b)
-# print "EEA:",d,",",u,",",v
-# print "custom EEA:\n",EEA(a,b,0)
+# print "bw decode, no error:\n",RS1.bw_decode(cw)
+# print "bw decode, error(s):\n",RS1.bw_decode(received)
+# print "eea decode, no error:\n",RS1.eea_decode(cw)
+# print "eea decode, error(s):\n",RS1.eea_decode(received)
