@@ -79,13 +79,12 @@ class ReedSolomonCode(BasicLinearCode):
     #run the extended euclidean algorithm between x^2t and the syndrome polynomial, up to the first iteration where the degree of the remainder is less than t
     eea_results = EEA(x^(2*self._t),syndrome_polynomial,self._t)
 
-    #the positions of the errors are the roots of the lambda function, which is equal to g(x) (scaled)
-    error_positions = [x[0] for x in eea_results.roots()]
-    correct_positions = set(range(self._length))-set(error_positions)
-
+    #the alphas at the error positions are the roots of the lambda function, which is equal to g(x) (scaled)
+    error_alphas = [x[0] for x in eea_results.roots()]
+    correct_alphas = set(self.alphas)-set(error_alphas)
     #calculate the lagrange interpolation
 
-    lagrange_interpolation = self._lagrange(correct_positions,received_word)
+    lagrange_interpolation = self._lagrange(correct_alphas,received_word)
     # print "lagrange:", lagrange_interpolation
 
     if lagrange_interpolation.degree() >= self._rank:
@@ -93,14 +92,15 @@ class ReedSolomonCode(BasicLinearCode):
     return vector(self._base_ring,lagrange_interpolation.list()+[0]*(self._rank-len(lagrange_interpolation.list())))
 
   # returns the lagrange interpolation for the current received word and its correct positions 
-  def _lagrange(self, correct_positions, received_word):
+  def _lagrange(self, correct_alphas, received_word):
     PF.<x> = self._base_ring[]
 
+    alphamap = {a_i:i for i, a_i in enumerate(self.alphas)}
     return sum([
-      received_word[i]*reduce(
-        lambda z,y: z*y, [(x-self.alphas[j])/(self.alphas[i]-self.alphas[j]) 
-        for j in correct_positions if j!=i]
-        ) for i in correct_positions])
+      received_word[alphamap[a_i]]*reduce(
+        lambda z,y: z*y, [(x-a_j)/(a_i-a_j) 
+        for a_j in correct_alphas if a_j!=a_i]
+        ) for a_i in correct_alphas])
 
   # returns the syndromes of the received word
   def get_syndromes(self, received_word):
@@ -138,11 +138,11 @@ def EEA(a,b,t):
 
   return M[1][1]
 
-# RS1 = ReedSolomonCode(7, 3, GF(13))
+# RS1 = ReedSolomonCode(7, 3, GF(13), alphas=[2,3,4,5,6,7,8])
 # print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
-# msg = vector(GF(13),[1,1,0])
+# msg = vector(GF(13),[5,0,1])
 # cw = RS1.encode(msg)
-# error = vector(GF(13),[1,0,0,0,0,0,1])
+# error = vector(GF(13),[1,0,0,0,6,0,0])
 # received = cw + error
 # print received
 # print RS1.eval_encode(msg)
