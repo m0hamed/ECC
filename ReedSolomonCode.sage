@@ -44,6 +44,56 @@ class ReedSolomonCode(BasicLinearCode):
           *diag(self._get_gammas())
     return self._parity_check_matrix
 
+  # Guruswami-sudan decoding algorithm
+  def gs_decode(self, received_word, tau, s, l):
+    # get polynomial coefficients
+    Qlist = self._interpolate(received_word, tau, s, l)
+    # convert coefficients into sage polynomial
+    Qpoly = self._make_poly(Qlist, tau, s, l)
+    # TODO: Find roots
+    return Qpoly
+
+  # takes a list of coefficients and returns a sage polynomial
+  def _make_poly(self, Qlist, tau, s, l):
+    # create polynomial ring
+    R.<x,y> = self._base_ring[]
+    # final polynomial Q(x,y)
+    Qpoly = 0
+    # a goes up to and including l
+    for a in xrange(l+1):
+      # polynomial Qa
+      Qa = 0
+      # b goes up to and including l_a
+      for b in xrange(s*(self._length - tau) - a*(self._rank - 1) - 1 + 1):
+        Qa += Qlist.pop(0)*(x^b)
+      Qpoly += Qa*(y^a)
+    return Qpoly
+
+  # returns a long list of coefficients of Q(x,y) as a list
+  def _interpolate(self, received_word, tau, s, l):
+    # matrix for the linear equations
+    m = []
+    for alpha, rec in zip(self.alphas, received_word):
+      # row of linear equations for each alpha and received word element
+      row = []
+      # a goes up to and including l
+      for a in xrange(l+1):
+        # b goes up to and including l_a
+        for b in xrange(s*(self._length - tau) - a*(self._rank - 1) - 1 + 1):
+          # the coefficent of Q_ab
+          coeff = 0
+          # h goes up to and including a but excluding s
+          for h in xrange(min(s, a + 1)):
+            # r goes up to and including b but excluding s-h
+            for r in xrange(min(s-h, b + 1)):
+              coeff += binomial(a,h)*binomial(b,r)*alpha^(a-h)*rec^(b-r)
+          row.append(coeff)
+      m.append(row)
+    # make a sage matrix out of it
+    m = matrix(self._base_ring, m)
+    # get one of the rows of the right kernel matrix as a list
+    return list(m.right_kernel_matrix()[-1])
+
   # Berlekamp-Welsh decoding
   # No failure checking!!
   def bw_decode(self, received_word):
@@ -91,14 +141,14 @@ class ReedSolomonCode(BasicLinearCode):
       return None
     return vector(self._base_ring,lagrange_interpolation.list()+[0]*(self._rank-len(lagrange_interpolation.list())))
 
-  # returns the lagrange interpolation for the current received word and its correct positions 
+  # returns the lagrange interpolation for the current received word and its correct positions
   def _lagrange(self, correct_alphas, received_word):
     PF.<x> = self._base_ring[]
 
     alphamap = {a_i:i for i, a_i in enumerate(self.alphas)}
     return sum([
       received_word[alphamap[a_i]]*reduce(
-        lambda z,y: z*y, [(x-a_j)/(a_i-a_j) 
+        lambda z,y: z*y, [(x-a_j)/(a_i-a_j)
         for a_j in correct_alphas if a_j!=a_i]
         ) for a_i in correct_alphas])
 
@@ -106,7 +156,7 @@ class ReedSolomonCode(BasicLinearCode):
   def get_syndromes(self, received_word):
     return [
       reduce(
-        lambda x,y: x+y, [self.alphas[h]^(m)*self._get_gammas()[h]*received_word[h] 
+        lambda x,y: x+y, [self.alphas[h]^(m)*self._get_gammas()[h]*received_word[h]
         for h in range(self._length)]
         )for m in range(self._t*2)]
 
