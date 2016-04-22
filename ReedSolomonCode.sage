@@ -86,7 +86,7 @@ class ReedSolomonCode(BasicLinearCode):
           for h in xrange(min(s, a + 1)):
             # r goes up to and including b but excluding s-h
             for r in xrange(min(s-h, b + 1)):
-              coeff += binomial(a,h)*binomial(b,r)*alpha^(a-h)*rec^(b-r)
+              coeff += binomial(a,h)*binomial(b,r)*rec^(a-h)*alpha^(b-r)
           row.append(coeff)
       m.append(row)
     # make a sage matrix out of it
