@@ -51,7 +51,7 @@ class ReedSolomonCode(BasicLinearCode):
     # convert coefficients into sage polynomial
     Qpoly = self._make_poly(Qlist, tau, s, l)
     # TODO: Find roots
-    return Qpoly
+    return self._find_roots(Qpoly)
 
   # takes a list of coefficients and returns a sage polynomial
   def _make_poly(self, Qlist, tau, s, l):
@@ -93,6 +93,31 @@ class ReedSolomonCode(BasicLinearCode):
     m = matrix(self._base_ring, m)
     # get one of the rows of the right kernel matrix as a list
     return list(m.right_kernel_matrix()[-1])
+
+  #factorizes the Q polynomial, finds factors of type "y-f(x)", and returns the list of f(x)
+  def _find_roots(self, Qpoly):
+    R.<x,y> = self._base_ring[]
+    results = []
+    #factorize the multivariate polynomial, and iterate over the factors
+    #factor[0] holds the factor, factor[1] the number of occurences of said factor
+    for factor in Qpoly.factor():
+      #if the current polynomial has "1*y" as a monomial, and
+      #it has a degree for y of 1, and
+      #it has a degree for x less than the rank
+      if (1,y) in factor[0] and factor[0].degree(y) == 1 and factor[0].degree(x) < self._rank:
+        #factor[0] is of the form y - f(x), get poly = f(x)
+        poly = y-factor[0]
+        #get the list of coefficients for x, cannot use .list() since this still has a type of multivariate polynomial
+        coeff = [poly.monomial_coefficient(x^d) for d in range(poly.degree(x)+1)]
+        #pad the coefficients with zeroes up to rank, make it a vector, and add to result list
+        results.append(vector(self._base_ring,coeff+[0]*(self._rank-len(coeff))))
+    
+    if len(results) == 0:
+      return None
+    elif len(results) == 1:
+      return results[0]
+    else:
+      return results
 
   # Berlekamp-Welsh decoding
   # No failure checking!!
@@ -189,8 +214,8 @@ def EEA(a,b,t):
   return M[1][1]
 
 # RS1 = ReedSolomonCode(7, 3, GF(13), alphas=[2,3,4,5,6,7,8])
-# print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
-# msg = vector(GF(13),[5,0,1])
+# # print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
+# msg = vector(GF(13),[5,1,0])
 # cw = RS1.encode(msg)
 # error = vector(GF(13),[1,0,0,0,6,0,0])
 # received = cw + error
@@ -201,3 +226,6 @@ def EEA(a,b,t):
 # print "bw decode, error(s):\n",RS1.bw_decode(received)
 # print "eea decode, no error:\n",RS1.eea_decode(cw)
 # print "eea decode, error(s):\n",RS1.eea_decode(received)
+# print "gs decode, error(s):\n",RS1.gs_decode(received, RS1._t, 1, 1)
+
+
