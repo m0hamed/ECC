@@ -101,12 +101,11 @@ class ReedSolomonCode(BasicLinearCode):
     #factorize the multivariate polynomial, and iterate over the factors
     #factor[0] holds the factor, factor[1] the number of occurences of said factor
     for factor in Qpoly.factor():
-      #if the current polynomial has "1*y" as a monomial, and
       #it has a degree for y of 1, and
       #it has a degree for x less than the rank
-      if (1,y) in factor[0] and factor[0].degree(y) == 1 and factor[0].degree(x) < self._rank:
-        #factor[0] is of the form y - f(x), get poly = f(x)
-        poly = y-factor[0]
+      if factor[0].degree(y) == 1 and factor[0].degree(x) < self._rank:
+        #divide the polynomial with the monomial coefficient of y, getting factor[0] to the form y - f(x), then get poly = f(x)
+        poly = y-factor[0]/factor[0].monomial_coefficient(y)
         #get the list of coefficients for x, cannot use .list() since this still has a type of multivariate polynomial
         coeff = [poly.monomial_coefficient(x^d) for d in range(poly.degree(x)+1)]
         #pad the coefficients with zeroes up to rank, make it a vector, and add to result list
@@ -169,8 +168,10 @@ class ReedSolomonCode(BasicLinearCode):
   # returns the lagrange interpolation for the current received word and its correct positions
   def _lagrange(self, correct_alphas, received_word):
     PF.<x> = self._base_ring[]
-
+    #essentially reverse of self.alphas
     alphamap = {a_i:i for i, a_i in enumerate(self.alphas)}
+    # creates a list of largange functions, which are the product of (x-a_j)/(a_i-a_j) for a_i != a_j
+    #return the sum of the list
     return sum([
       received_word[alphamap[a_i]]*reduce(
         lambda z,y: z*y, [(x-a_j)/(a_i-a_j)
@@ -217,7 +218,7 @@ def EEA(a,b,t):
 # # print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
 # msg = vector(GF(13),[5,1,0])
 # cw = RS1.encode(msg)
-# error = vector(GF(13),[1,0,0,0,6,0,0])
+# error = vector(GF(13),[1,0,0,1,0,0,0])
 # received = cw + error
 # print received
 # print RS1.eval_encode(msg)
