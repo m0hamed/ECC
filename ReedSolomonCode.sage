@@ -46,10 +46,8 @@ class ReedSolomonCode(BasicLinearCode):
 
   # Guruswami-sudan decoding algorithm
   def gs_decode(self, received_word, tau, s, l):
-    # get polynomial coefficients
-    Qlist = self._interpolate(received_word, tau, s, l)
-    # convert coefficients into sage polynomial
-    Qpoly = self._make_poly(Qlist, tau, s, l)
+    # get interpolation polynomial
+    Qpoly = self._knh_interpolate(received_word, tau, s, l)
     # TODO: Find roots
     return Qpoly
 
@@ -91,8 +89,36 @@ class ReedSolomonCode(BasicLinearCode):
       m.append(row)
     # make a sage matrix out of it
     m = matrix(self._base_ring, m)
-    # get one of the rows of the right kernel matrix as a list
-    return list(m.right_kernel_matrix()[-1])
+    # get one of the rows of the right kernel matrix as a list (polynomial coefficients)
+    Qlist = list(m.right_kernel_matrix()[-1])
+    # convert coefficients into sage polynomial
+    return self._make_poly(Qlist, tau, s, l)
+
+  # TODO: what is w also how to choose the rest of params
+  # TODO: this is not tested at all
+  def _knh_interpolate(self, received_word, tau, s, l):
+    R.<x,y> = self._base_ring[]
+    B = [y^i for i in xrange(l+1)]
+    for alpha, rec in zip(self.alphas, received_word):
+      for bound in xrange(s):
+        for dx in xrange(bound+1):
+          dy = bound-dx
+          minwdeg = 10000
+          minbj = None
+          for bj in B:
+            if bj(x+alpha, y+rec).monomial_coefficient(x^dx*y^dy) != 0:
+              wdeg = bj.weighted_degree({x:1, y:self._rank-1})
+              if wdeg < minwdeg:
+                minwdeg = wdeg
+                minbj = bj
+          Bnew = []
+          for bj in B:
+            if bj == minbj:
+              continue
+            Bnew.append(bj - (bj(x+alpha, y+rec).monomial_coefficient(x^dx*y^dy)/minbj(x+alpha, y+rec).monomial_coefficient(x^dx*y^dy))*minbj)
+          Bnew.append((x-alpha)*minbj)
+          B = Bnew
+    return min(B, key=lambda bj: bj.weighted_degree({x:1, y:self._rank-1}))
 
   # Berlekamp-Welsh decoding
   # No failure checking!!
