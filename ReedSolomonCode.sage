@@ -49,7 +49,7 @@ class ReedSolomonCode(BasicLinearCode):
     # get interpolation polynomial
     Qpoly = self._knh_interpolate(received_word, tau, s, l)
     # TODO: Find roots
-    return Qpoly
+    return self._find_roots(Qpoly)
 
   # takes a list of coefficients and returns a sage polynomial
   def _make_poly(self, Qlist, tau, s, l):
@@ -120,6 +120,30 @@ class ReedSolomonCode(BasicLinearCode):
           B = Bnew
     return min(B, key=lambda bj: bj.weighted_degree({x:1, y:self._rank-1}))
 
+  #factorizes the Q polynomial, finds factors of type "y-f(x)", and returns the list of f(x)
+  def _find_roots(self, Qpoly):
+    R.<x,y> = self._base_ring[]
+    results = []
+    #factorize the multivariate polynomial, and iterate over the factors
+    #factor[0] holds the factor, factor[1] the number of occurences of said factor
+    for factor in Qpoly.factor():
+      #it has a degree for y of 1, and
+      #it has a degree for x less than the rank
+      if factor[0].degree(y) == 1 and factor[0].degree(x) < self._rank:
+        #divide the polynomial with the monomial coefficient of y, getting factor[0] to the form y - f(x), then get poly = f(x)
+        poly = y-factor[0]/factor[0].monomial_coefficient(y)
+        #get the list of coefficients for x, cannot use .list() since this still has a type of multivariate polynomial
+        coeff = [poly.monomial_coefficient(x^d) for d in range(poly.degree(x)+1)]
+        #pad the coefficients with zeroes up to rank, make it a vector, and add to result list
+        results.append(vector(self._base_ring,coeff+[0]*(self._rank-len(coeff))))
+    
+    if len(results) == 0:
+      return None
+    elif len(results) == 1:
+      return results[0]
+    else:
+      return results
+
   # Berlekamp-Welsh decoding
   # No failure checking!!
   def bw_decode(self, received_word):
@@ -170,8 +194,10 @@ class ReedSolomonCode(BasicLinearCode):
   # returns the lagrange interpolation for the current received word and its correct positions
   def _lagrange(self, correct_alphas, received_word):
     PF.<x> = self._base_ring[]
-
+    #essentially reverse of self.alphas
     alphamap = {a_i:i for i, a_i in enumerate(self.alphas)}
+    # creates a list of largange functions, which are the product of (x-a_j)/(a_i-a_j) for a_i != a_j
+    #return the sum of the list
     return sum([
       received_word[alphamap[a_i]]*reduce(
         lambda z,y: z*y, [(x-a_j)/(a_i-a_j)
@@ -215,10 +241,10 @@ def EEA(a,b,t):
   return M[1][1]
 
 # RS1 = ReedSolomonCode(7, 3, GF(13), alphas=[2,3,4,5,6,7,8])
-# print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
-# msg = vector(GF(13),[5,0,1])
+# # print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
+# msg = vector(GF(13),[5,1,0])
 # cw = RS1.encode(msg)
-# error = vector(GF(13),[1,0,0,0,6,0,0])
+# error = vector(GF(13),[1,0,0,1,0,0,0])
 # received = cw + error
 # print received
 # print RS1.eval_encode(msg)
@@ -227,3 +253,6 @@ def EEA(a,b,t):
 # print "bw decode, error(s):\n",RS1.bw_decode(received)
 # print "eea decode, no error:\n",RS1.eea_decode(cw)
 # print "eea decode, error(s):\n",RS1.eea_decode(received)
+# print "gs decode, error(s):\n",RS1.gs_decode(received, RS1._t, 1, 1)
+
+
