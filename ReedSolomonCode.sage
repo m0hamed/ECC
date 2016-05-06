@@ -44,11 +44,50 @@ class ReedSolomonCode(BasicLinearCode):
           *diag(self._get_gammas())
     return self._parity_check_matrix
 
+  def _get_decode_params(self, tau=None):
+    # get n,k for easy coding
+    n, k = self._length, self._rank
+    # caluculate johnson radius
+    johnson = n - sqrt(n*(k-1))
+
+    #check if specified tau is too large
+    if tau is not None and tau >= floor(johnson):
+      print "Specified tau too large!"
+
+    # set best tau possibly overriding incorrect tau
+    if tau is None or tau >= floor(johnson):
+      tau = floor(johnson)
+
+    # if tau is still too big (integer value of johnson)
+    if tau >= johnson:
+      tau -= 1
+
+    # flag to break out of loop
+    stop = False
+    # l up to 30, just some arbitrary number
+    for l in xrange(1, 30):
+      if stop:
+        break
+      # s should be less than l
+      for s in xrange(1, l+1):
+        bound = n*(2*l-s+1)/(2*(l+1))-l*(k-1)/(2*s)
+        if tau < bound:
+          stop = True
+          break
+    # if no good params found
+    else:
+      # return half min dist and 1,1 for normal non-list decoding
+      return int((n-k+1)/2), 1, 1
+
+    return tau, s, l
+
   # Guruswami-sudan decoding algorithm
-  def gs_decode(self, received_word, tau, s, l):
+  def gs_decode(self, received_word, tau=None):
+    tau, s, l = self._get_decode_params(tau)
+    print "using tau=%i, s=%i, l=%i" % (tau, s, l)
     # get interpolation polynomial
-    Qpoly = self._knh_interpolate(received_word, tau, s, l)
-    # TODO: Find roots
+    Qpoly = self._interpolate(received_word, tau, s, l)
+    print Qpoly
     return self._find_roots(Qpoly)
 
   # takes a list of coefficients and returns a sage polynomial
@@ -90,7 +129,7 @@ class ReedSolomonCode(BasicLinearCode):
     # make a sage matrix out of it
     m = matrix(self._base_ring, m)
     # get one of the rows of the right kernel matrix as a list (polynomial coefficients)
-    Qlist = list(m.right_kernel_matrix()[-1])
+    Qlist = list(m.right_kernel_matrix()[1])
     # convert coefficients into sage polynomial
     return self._make_poly(Qlist, tau, s, l)
 
@@ -136,7 +175,7 @@ class ReedSolomonCode(BasicLinearCode):
         coeff = [poly.monomial_coefficient(x^d) for d in range(poly.degree(x)+1)]
         #pad the coefficients with zeroes up to rank, make it a vector, and add to result list
         results.append(vector(self._base_ring,coeff+[0]*(self._rank-len(coeff))))
-    
+
     if len(results) == 0:
       return None
     elif len(results) == 1:
