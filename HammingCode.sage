@@ -26,6 +26,9 @@ class HammingCode(BasicLinearCode):
   def parity_check_matrix(self):
     return self._parity_check_matrix
 
+  def minimum_distance(self):
+    return 3
+
 #test of hamming generation
 #m = 4
 #h = hamming(m)
