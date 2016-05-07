@@ -44,8 +44,48 @@ class ReedSolomonCode(BasicLinearCode):
           *diag(self._get_gammas())
     return self._parity_check_matrix
 
+  def _get_decode_params(self, tau=None):
+    # get n,k for easy coding
+    n, k = self._length, self._rank
+    # caluculate johnson radius
+    johnson = n - sqrt(n*(k-1))
+
+    #check if specified tau is too large
+    if tau is not None and tau >= floor(johnson):
+      print "Specified tau too large!"
+
+    # set best tau possibly overriding incorrect tau
+    if tau is None or tau >= floor(johnson):
+      tau = floor(johnson)
+
+    # if tau is still too big (integer value of johnson)
+    if tau >= johnson:
+      tau -= 1
+
+    # flag to break out of loop
+    stop = False
+    # l up to 30, just some arbitrary number
+    for l in xrange(1, 30):
+      if stop:
+        break
+      # s should be less than l
+      for s in xrange(1, l+1):
+        bound = n*(2*l-s+1)/(2*(l+1))-l*(k-1)/(2*s)
+        if tau < bound:
+          stop = True
+          break
+    # if no good params found
+    else:
+      # return half min dist and 1,1 for normal non-list decoding
+      return int((n-k+1)/2), 1, 1
+
+    return tau, s, l
+
   # Guruswami-sudan decoding algorithm
-  def gs_decode(self, received_word, tau, s, l, interpolate="knh", roots="simple"):
+  def gs_decode(self, received_word, tau=None, s=None, l=None, interpolate="knh", roots="simple"):
+    if tau is None or s is None or l is None:
+      tau, s, l = self._get_decode_params(tau)
+    print "using tau=%i, s=%i, l=%i" % (tau, s, l)
     # get interpolation polynomial
     if interpolate == "knh":
       Qpoly = self._knh_interpolate(received_word, tau, s, l)
@@ -53,6 +93,8 @@ class ReedSolomonCode(BasicLinearCode):
       Qpoly = self._interpolate(received_word, tau, s, l)
     else:
       return None
+
+    print Qpoly
 
     # find roots
     if roots == "simple":
@@ -63,7 +105,7 @@ class ReedSolomonCode(BasicLinearCode):
       words = self._find_roots_roth(Qpoly)
     else:
       return None
-    
+
     # print "decode results:", words
 
     #return codewords ...
@@ -71,6 +113,8 @@ class ReedSolomonCode(BasicLinearCode):
     # return [codeword for codeword in codewords if self.distance(codeword,received_word) <= tau]
 
     #.. or return unencoded words
+    # return only the words whose codewords are in the required distance range
+    
     # print "distances:", [self.distance(self.eval_encode(word),received_word) for word in words]
     return [word for word in words if self.distance(self.eval_encode(word),received_word) <= tau]
 
@@ -113,7 +157,7 @@ class ReedSolomonCode(BasicLinearCode):
     # make a sage matrix out of it
     m = matrix(self._base_ring, m)
     # get one of the rows of the right kernel matrix as a list (polynomial coefficients)
-    Qlist = list(m.right_kernel_matrix()[-1])
+    Qlist = list(m.right_kernel_matrix()[1])
     # convert coefficients into sage polynomial
     return self._make_poly(Qlist, tau, s, l)
 
@@ -142,6 +186,7 @@ class ReedSolomonCode(BasicLinearCode):
           Bnew.append((x-alpha)*minbj)
           B = Bnew
     return min(B, key=lambda bj: bj.weighted_degree({x:1, y:self._rank-1}))
+
 
   #factorizes the Q polynomial, finds factors of type "y-f(x)", and returns the list of f(x)
   def _find_roots(self, Qpoly):
@@ -327,7 +372,6 @@ class ReedSolomonCode(BasicLinearCode):
     
     return ret
 
-
   # Berlekamp-Welsh decoding
   # No failure checking!!
   def bw_decode(self, received_word):
@@ -455,7 +499,7 @@ def extension_poly_print(base_ring, poly, nl=True):
 
 ##### simple example, guruswami sudan ran with parameters t,1,1
 # RS1 = ReedSolomonCode(7, 3, GF(13), alphas=[2,3,4,5,6,7,8])
-# # print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
+# print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
 # msg = vector(GF(13),[5,6,1])
 # cw = RS1.encode(msg)
 # error = vector(GF(13),[1,0,0,1,0,0,0])
@@ -469,7 +513,7 @@ def extension_poly_print(base_ring, poly, nl=True):
 # print "eea decode, error(s):\n",RS1.eea_decode(received)
 # for ip in ["book","knh"]:
 #   for root in ["simple","book","roth"]:
-#     print "gs decode("+ip+","+root+"), error(s):\n",RS1.gs_decode(received, RS1._t, 1, 1, interpolate=ip, roots=root)
+#     print "gs decode("+ip+","+root+"), error(s):\n",RS1.gs_decode(received, interpolate=ip, roots=root)
 
 #### book example, p.134
 
@@ -485,7 +529,7 @@ def extension_poly_print(base_ring, poly, nl=True):
 # print msg
 # # print "bw decode, error(s):\n",RS2.bw_decode(received)
 # # print "eea decode, error(s):\n",RS2.eea_decode(received)
-# print "gs decode, error(s):\n",RS2.gs_decode(received, 5, 4, 6)
+# print "gs decode, error(s):\n",RS2.gs_decode(received, tau=5, s=4, l=4)
 
 # Roth paper example: http://www.cs.technion.ac.il/~ronny/PUB/rs.pdf
 
@@ -498,7 +542,7 @@ def extension_poly_print(base_ring, poly, nl=True):
 
 # for ip in ["book","knh"]:
 #   for root in ["simple","book","roth"]:
-#     print "gs decode("+ip+","+root+"), error(s):\n",RS3.gs_decode(received, 12, 1, 4, interpolate=ip, roots=root)
+#     print "gs decode("+ip+","+root+"), error(s):\n",RS3.gs_decode(received, tau=12, s=1, l=4, interpolate=ip, roots=root)
 
 #### Qpolys to find roots in from Roth paper example, something goes wrong
 
