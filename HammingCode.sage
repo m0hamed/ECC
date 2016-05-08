@@ -22,6 +22,8 @@ class HammingCode(BasicLinearCode):
     self._parity_check_matrix = A.transpose().augment(matrix.identity(length-rank))
     self._base_ring = GF(2)
     self._rank, self._length = self._generator_matrix.dimensions()
+    self._syndrome_dict = None
+    self._codewords = None
 
   def parity_check_matrix(self):
     return self._parity_check_matrix

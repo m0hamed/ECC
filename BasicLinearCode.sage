@@ -107,7 +107,7 @@ class BasicLinearCode:
 
 
   # generate syndrome dictionary
-  def generate_syndromes(self):
+  def generate_syndromes(self, silent=False):
     if self._syndrome_dict is not None:
       return
     self._syndrome_dict = {}
@@ -132,7 +132,8 @@ class BasicLinearCode:
           syndrome = self.get_syndrome(error)
           if not syndrome.is_zero() and syndrome not in self._syndrome_dict:
             found_new_syndrome = True
-            print "syndrome table:", "{0:.2f}".format(float(len(self._syndrome_dict)/syndrome_dict_full_size)*100)," percent full\r",
+            if not silent:
+              print "syndrome table:", "{0:.2f}".format(float(len(self._syndrome_dict)/syndrome_dict_full_size)*100)," percent full\r",
             self._syndrome_dict[syndrome] = error
           if len(self._syndrome_dict) == syndrome_dict_full_size:
             return
@@ -140,11 +141,12 @@ class BasicLinearCode:
           if not next_permutation(permutation):
             break
       if not found_new_syndrome:
-        print "No new syndromes found at error weight %i , stopping" % nerrors
+        if not silent:
+          print "No new syndromes found at error weight %i , stopping" % nerrors
         self._cover_radius = nerrors-1
         break
   def cover_radius(self):
-    self.generate_syndromes()
+    self.generate_syndromes(silent=True)
     return self._cover_radius
 
   #generator for all unique lists of nerrors length in finite field, without zero values and ordered

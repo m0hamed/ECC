@@ -47,7 +47,7 @@ def plotkin_bound(pp=True, **kwargs):
     return int(n*2^(k-1)/(2^k-1))
   elif n is None:
     if pp: print "A linear Code with dimension %i and minimum distance %i must have a length of at least %i within the plotkin bound" % (k,d,d*2^(k-1)/(2^k-1))
-    return int(d*2^(k-1)/(2^k-1))
+    return int(d*(2^k-1)/2^(k-1))
   elif k is None:
     raise Exception, "You can't query the plotkin bound on the parameter k"
 
@@ -65,7 +65,7 @@ def griesmer_bound(pp=True, **kwargs):
       if pp: print "A linear Code with length %i and dimension %i can have a distance of at most %i within the griesmer bound" % (n,k,n*2^(k-1)/(2^k-1))
       return False
   if d is None:
-    raise Exception, "You can't query the griesmer bound on the parameter k"
+    raise Exception, "You can't query the griesmer bound on the parameter d"
   elif k is None:
     raise Exception, "You can't query the griesmer bound on the parameter k"
   elif n is None:
