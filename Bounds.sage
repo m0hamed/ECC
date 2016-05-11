@@ -36,7 +36,7 @@ def singleton_bound(pp=True, **kwargs):
 def plotkin_bound(pp=True, **kwargs):
   n, d, k, count_nones = get_ndk(kwargs)
   if count_nones == 0:
-    if d <= n*2^(k-1)/(2^k-1):
+    if d <= n*(2^(k-1))/(2^k-1):
       if pp: print "A linear Code with length %i, dimension %i and a maximum distance %i can exist within the plotkin bound" % (n,k,d)
       return True
     else:
@@ -44,10 +44,10 @@ def plotkin_bound(pp=True, **kwargs):
       return False
   if d is None:
     if pp: print "A linear Code with length %i and dimension %i can have a distance of at most %i within the plotkin bound" % (n,k,n*2^(k-1)/(2^k-1))
-    return int(n*2^(k-1)/(2^k-1))
+    return n*(2^(k-1))/(2^k-1)
   elif n is None:
     if pp: print "A linear Code with dimension %i and minimum distance %i must have a length of at least %i within the plotkin bound" % (k,d,d*2^(k-1)/(2^k-1))
-    return int(d*(2^k-1)/2^(k-1))
+    return int(d*(2^k-1)/(2^(k-1)))
   elif k is None:
     raise Exception, "You can't query the plotkin bound on the parameter k"
 
@@ -69,7 +69,7 @@ def griesmer_bound(pp=True, **kwargs):
   elif k is None:
     raise Exception, "You can't query the griesmer bound on the parameter k"
   elif n is None:
-    min_n = sum([ceil(d/2**i) for i in xrange(k)])
+    min_n = ceil(sum([ceil(d/2**i) for i in xrange(k)]))
     if pp: print "A linear Code with dimension %i and minimum distance %i must have a length of at least %i within the griesmer bound" % (k,d,min_n)
     return min_n
 
