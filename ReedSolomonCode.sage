@@ -114,9 +114,19 @@ class ReedSolomonCode(BasicLinearCode):
 
     #.. or return unencoded words
     # return only the words whose codewords are in the required distance range
-    
+
     # print "distances:", [self.distance(self.eval_encode(word),received_word) for word in words]
     return [word for word in words if self.distance(self.eval_encode(word),received_word) <= tau]
+
+  def _check_multiplicity(self, poly, encoded_word, s):
+    for alpha, enc in zip(self.alphas, encoded_word):
+      for bound in xrange(s):
+        for dx in xrange(bound+1):
+          dy = bound-dx
+          if poly(x+alpha, y+enc).monomial_coefficient(x^dx*y^dy) != 0:
+            print "Multiplicity test failed"
+            print "dx=%i, dy=%i, poly=%s" % (dx, dy, str(poly(x+alpha, y+enc)))
+            return False
 
   # takes a list of coefficients and returns a sage polynomial
   def _make_poly(self, Qlist, tau, s, l):
@@ -134,7 +144,17 @@ class ReedSolomonCode(BasicLinearCode):
       Qpoly += Qa*(y^a)
     return Qpoly
 
-  # returns a long list of coefficients of Q(x,y) as a list
+  # takes a sage polynomial and returns a list of coefficients
+  def _make_list(self, Qpoly, tau, s, l):
+    R.<x,y> = self._base_ring[]
+    Qlist = []
+    for a in xrange(l+1):
+      # b goes up to and including l_a
+      for b in xrange(s*(self._length - tau) - a*(self._rank - 1) - 1 + 1):
+        Qlist.append(Qpoly.monomial_coefficient(y^a*x^b))
+    return Qlist
+
+  # Interpolates Q(x,y) by solving a system of linear equations
   def _interpolate(self, received_word, tau, s, l):
     # matrix for the linear equations
     m = []
@@ -151,41 +171,71 @@ class ReedSolomonCode(BasicLinearCode):
           for h in xrange(min(s, a + 1)):
             # r goes up to and including b but excluding s-h
             for r in xrange(min(s-h, b + 1)):
-              coeff += binomial(a,h)*binomial(b,r)*rec^(a-h)*alpha^(b-r)
+              coeff += binomial(a,h)*binomial(b,r)*(rec^(a-h))*(alpha^(b-r))
           row.append(coeff)
       m.append(row)
     # make a sage matrix out of it
     m = matrix(self._base_ring, m)
+    #pdb.set_trace()
     # get one of the rows of the right kernel matrix as a list (polynomial coefficients)
-    Qlist = list(m.right_kernel_matrix()[1])
+    Qlist = list(m.right_kernel_matrix()[0])
+    #print Qlist, len(Qlist)
     # convert coefficients into sage polynomial
     return self._make_poly(Qlist, tau, s, l)
 
-  # TODO: what is w also how to choose the rest of params
-  # TODO: this is not tested at all
   def _knh_interpolate(self, received_word, tau, s, l):
     R.<x,y> = self._base_ring[]
     B = [y^i for i in xrange(l+1)]
     for alpha, rec in zip(self.alphas, received_word):
+      Hs = [self._build_H_matrix(b, alpha, rec, s) for b in B]
       for bound in xrange(s):
         for dx in xrange(bound+1):
           dy = bound-dx
           minwdeg = 10000
           minbj = None
-          for bj in B:
-            if bj(x+alpha, y+rec).monomial_coefficient(x^dx*y^dy) != 0:
+          minHj = None
+          for bj, Hj in zip(B, Hs):
+            if Hj[dx][dy] != 0:
               wdeg = bj.weighted_degree({x:1, y:self._rank-1})
               if wdeg < minwdeg:
                 minwdeg = wdeg
                 minbj = bj
+                minHj = Hj
           Bnew = []
-          for bj in B:
+          Hsnew = []
+          for bj, Hj in zip(B, Hs):
             if bj == minbj:
               continue
-            Bnew.append(bj - (bj(x+alpha, y+rec).monomial_coefficient(x^dx*y^dy)/minbj(x+alpha, y+rec).monomial_coefficient(x^dx*y^dy))*minbj)
+            Bnew.append(bj - (Hj[dx][dy]/minHj[dx][dy])*minbj)
+            Hsnew.append(Hj - (Hj[dx][dy]/minHj[dx][dy])*minHj)
           Bnew.append((x-alpha)*minbj)
+          Hsnew.append(self._shift_down_H_matrix(minHj, s))
           B = Bnew
+          Hs = Hsnew
     return min(B, key=lambda bj: bj.weighted_degree({x:1, y:self._rank-1}))
+
+  # shifts the hasse derivative matrix down a row
+  def _shift_down_H_matrix(self, H, s):
+    # transform back into mutuable list
+    H = list(H)
+    # add new row
+    H.insert(0, [0]*s)
+    # remove last row
+    H.pop()
+    # change back into matrix and return
+    return matrix(self._base_ring, H)
+
+  # builds a matrix of Hasse derivatives
+  def _build_H_matrix(self, poly, x0, y0, s):
+    # set up x and y
+    R.<x,y> = self._base_ring[]
+    # initial H matrix of all 0s
+    H = [[0]*s for _ in xrange(s)]
+    for dx in xrange(s):
+      for dy in xrange(s-dx):
+        # set correct hasse derivative value
+        H[dx][dy] = poly(x+x0, y+y0).monomial_coefficient(x^dx*y^dy)
+    return matrix(self._base_ring, H)
 
 
   #factorizes the Q polynomial, finds factors of type "y-f(x)", and returns the list of f(x)
@@ -204,7 +254,7 @@ class ReedSolomonCode(BasicLinearCode):
         coeff = [poly.monomial_coefficient(x^d) for d in range(poly.degree(x)+1)]
         #pad the coefficients with zeroes up to rank, make it a vector, and add to result list
         results.append(vector(self._base_ring,coeff+[0]*(self._rank-len(coeff))))
-    
+
     return results
 
   #factorizes the Q polynomial, finds factors of type "y-f(x)", and returns the list of f(x)
@@ -218,7 +268,7 @@ class ReedSolomonCode(BasicLinearCode):
 
     #book example recreation irreducible polynomial, for debug purposes
     #h = 1 + a^11*z + a^6*z^2 + a^8*z^3 + a^11*z^4 + a^12*z^5 + a^13*z^6 + z^7
-    
+
     #create a polynomial of rank degree, that is irreducible over Fq
     h = Z.irreducible_element(self._rank)
 
@@ -239,7 +289,7 @@ class ReedSolomonCode(BasicLinearCode):
 
     #get a list of coefficients of powers of y, each coefficient is a polynomial of x
     y_coefficients = [Qpoly.coefficient({y:d}) for d in range(Qpoly.degree(y)+1)]
-    
+
     if debug:
       print "Qpoly coefficients of y^i:"
       for i,xc in enumerate(y_coefficients):
@@ -248,7 +298,7 @@ class ReedSolomonCode(BasicLinearCode):
 
     #convert each list element from a multivariate polynomial to a univariate polynomial
     y_coefficients = [sum([poly.monomial_coefficient(x^d)*z^d for d in range(poly.degree(x)+1)]) for poly in y_coefficients]
-    
+
     if debug:
       print "Qpoly coefficients of y^i, converted to univariate polynomials:"
       for i,xc in enumerate(y_coefficients):
@@ -273,7 +323,7 @@ class ReedSolomonCode(BasicLinearCode):
 
     # get the univariate polynomial, with coefficients in the larger extension field
     Qpoly_univariate = sum([y_coefficients_modulo[d]*p^d for d in range(Qpoly.degree(y)+1)])
-    
+
     if debug:
       print "Qpoly new normal:"
       print Qpoly_univariate
@@ -314,13 +364,13 @@ class ReedSolomonCode(BasicLinearCode):
   def _find_roots_roth(self, Qpoly):
     words = self._reconstruct(Qpoly,0,[[]])
     return [vector(self._base_ring,word) for word in words]
-    
-    
+
+
   #
   def _reconstruct(self,Qpoly,i,prev, debug=False):
     R.<x,y> = self._base_ring[]
     Z.<z> = self._base_ring[]
-    
+
     ret = []
 
     if debug:
@@ -348,7 +398,7 @@ class ReedSolomonCode(BasicLinearCode):
 
 
     Qtest = Qpoly(0,y)
-    
+
     if debug:
       print "poly to find roots in:", Qtest
 
@@ -365,11 +415,11 @@ class ReedSolomonCode(BasicLinearCode):
       tmpprev = [j+[root] for j in prev]
       if i < self._rank-1:
         Qpoly = Qpoly(x,x*y+root)
-        #recursive calling into rank depth 
+        #recursive calling into rank depth
         ret += self._reconstruct(Qpoly,i+1,tmpprev)
       else:
         ret += tmpprev
-    
+
     return ret
 
   # Berlekamp-Welsh decoding
@@ -484,7 +534,7 @@ def extension_poly_print(base_ring, poly, nl=True):
 
     coeffs = poly.list();
     for i,j in enumerate(coeffs):
-      
+
       coeff = j
       if coeff != 0:
         print rev[coeff],
@@ -548,18 +598,18 @@ def extension_poly_print(base_ring, poly, nl=True):
 
 # R.<x,y> = GF(19)[]
 # Qpoly =  4 + 12*x + 5*x^2 + 11*x^3 + 8*x^4 + 13*x^5
-# Qpoly += (14 + 14*x + 9*x^2 + 16*x^3 + 8*x^4)*y  
-# Qpoly += (14 + 13*x + x*2)*y^2  
-# Qpoly += (2 + 11*x + x^2)*y^3  
+# Qpoly += (14 + 14*x + 9*x^2 + 16*x^3 + 8*x^4)*y
+# Qpoly += (14 + 13*x + x*2)*y^2
+# Qpoly += (2 + 11*x + x^2)*y^3
 # Qpoly += 17*y^4
 # print RS3._find_roots(Qpoly)
 # print RS3._find_roots_book(Qpoly)
 # print RS3._find_roots_roth(Qpoly)
 
 # Qpoly =  8 +        12*x^2 + 9*x^3 + 8*x^4
-# Qpoly += (5 + 14*x + 7*x^2 + 15*x^3 + 4*x^4)*y  
-# Qpoly += (12 + 12*x + 15*x*2 + 4*x^3)*y^2  
-# Qpoly += (9 + 10*x + 14*x^2)*y^3  
+# Qpoly += (5 + 14*x + 7*x^2 + 15*x^3 + 4*x^4)*y
+# Qpoly += (12 + 12*x + 15*x*2 + 4*x^3)*y^2
+# Qpoly += (9 + 10*x + 14*x^2)*y^3
 # Qpoly += (13+x)*y^4
 # print RS3._find_roots(Qpoly)
 # print RS3._find_roots_book(Qpoly)
