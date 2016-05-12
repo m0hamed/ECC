@@ -110,7 +110,7 @@ class ReedSolomonCode(BasicLinearCode):
 
     #return codewords ...
     # codewords = [self.eval_encode(word) for word in words]
-    # return [codeword for codeword in codewords if self.distance(codeword,received_word) <= tau]
+    # print [codeword for codeword in codewords if self.distance(codeword,received_word) <= tau]
 
     #.. or return unencoded words
     # return only the words whose codewords are in the required distance range
@@ -157,7 +157,7 @@ class ReedSolomonCode(BasicLinearCode):
     # make a sage matrix out of it
     m = matrix(self._base_ring, m)
     # get one of the rows of the right kernel matrix as a list (polynomial coefficients)
-    Qlist = list(m.right_kernel_matrix()[1])
+    Qlist = list(m.right_kernel_matrix()[-1])
     # convert coefficients into sage polynomial
     return self._make_poly(Qlist, tau, s, l)
 
@@ -214,7 +214,10 @@ class ReedSolomonCode(BasicLinearCode):
     #multivariate polynomial ring over GF(q), for the Qpoly
     R.<x,y> = self._base_ring[]
     #univariate polynomial ring over GF(q), for operation of coefficients of y^i in the multivariate polynomial
-    Z.<z> = self._base_ring[]
+    
+    # Z.<z> = self._base_ring[]
+    Z = PolynomialRing(self._base_ring, 'x')
+    z = Z.gen()
 
     #book example recreation irreducible polynomial, for debug purposes
     #h = 1 + a^11*z + a^6*z^2 + a^8*z^3 + a^11*z^4 + a^12*z^5 + a^13*z^6 + z^7
@@ -232,13 +235,9 @@ class ReedSolomonCode(BasicLinearCode):
       extension_poly_print( self._base_ring, h)
       extension_poly_print( self._base_ring, U.modulus())
 
-    #attempt to create a direct extension field with one primitive element, to map to and from the field with two primitive elements, and get over factorization not being implemented
-    # S.<s> = self._base_ring.extension(self._rank)
-    # L.<l> = S[]
 
-
-    #get a list of coefficients of powers of y, each coefficient is a polynomial of x
-    y_coefficients = [Qpoly.coefficient({y:d}) for d in range(Qpoly.degree(y)+1)]
+    #get a list of coefficients of powers of y, each coefficient is a polynomial of x. Also converts the coefficients to univariate
+    y_coefficients = [Z(Qpoly.coefficient({y:d})) for d in range(Qpoly.degree(y)+1)]
     
     if debug:
       print "Qpoly coefficients of y^i:"
@@ -246,16 +245,16 @@ class ReedSolomonCode(BasicLinearCode):
         if xc != 0:
           print "  (", xc, ") * y^", str(i)
 
-    #convert each list element from a multivariate polynomial to a univariate polynomial
-    y_coefficients = [sum([poly.monomial_coefficient(x^d)*z^d for d in range(poly.degree(x)+1)]) for poly in y_coefficients]
+    #convert each list element from a multivariate polynomial to a univariate polynomial 
+    # y_coefficients = [sum([poly.monomial_coefficient(x^d)*z^d for d in range(poly.degree(x)+1)]) for poly in y_coefficients]
     
-    if debug:
-      print "Qpoly coefficients of y^i, converted to univariate polynomials:"
-      for i,xc in enumerate(y_coefficients):
-        if xc != 0:
-          print "  (",
-          extension_poly_print( self._base_ring, xc, False)
-          print ") * y^", str(i)
+    # if debug:
+    #   print "Qpoly coefficients of y^i, converted to univariate polynomials:"
+    #   for i,xc in enumerate(y_coefficients):
+    #     if xc != 0:
+    #       print "  (",
+    #       extension_poly_print( self._base_ring, xc, False)
+    #       print ") * y^", str(i)
 
     #get the Φ mapped elements from the coefficients, which are the coefficients modulo the polynomial generating the extension field
     y_coefficients_modulo = [coeff.quo_rem(h)[1] if coeff !=0 else 0 for coeff in y_coefficients]
@@ -278,13 +277,16 @@ class ReedSolomonCode(BasicLinearCode):
       print "Qpoly new normal:"
       print Qpoly_univariate
 
+    #attempt to create a direct extension field with one primitive element, to map to and from the field with two primitive elements, and get over factorization not being implemented
+    # S.<s> = self._base_ring.extension(self._rank)
+    # L.<l> = S[]
+
     #attempt to get a polynomial in the extension field of p^(i+k), where k rank and q = p^i
     #instead of a polynomial in the extension q^k of the original extension q = p^i
     #this is done to try and circumvent the non-implementation of factorization in the "double" extension field
     #fails due to no possible coercion
+
     # Qpoly_univariate = sum([S(y_coefficients_modulo[d])*l^d for d in range(Qpoly.degree(y)+1)])
-    # print "Qpoly:"
-    # print Qpoly_univariate
 
     results = []
     for (factor,_) in Qpoly_univariate.factor():
@@ -294,7 +296,8 @@ class ReedSolomonCode(BasicLinearCode):
         poly = p-factor/factor.list()[1]
 
         #convert poly from univariate polynomial in extension field, to an element in the extension field
-        poly = poly.list()[0]
+        if poly != 0:
+          poly = poly.list()[0]
         #convert poly from an element in the extension field to a univariate polynomial in the base field
         poly = Z(poly)
 
@@ -319,54 +322,51 @@ class ReedSolomonCode(BasicLinearCode):
   #
   def _reconstruct(self,Qpoly,i,prev, debug=False):
     R.<x,y> = self._base_ring[]
-    Z.<z> = self._base_ring[]
+    Z = PolynomialRing(self._base_ring, 'y')
+    z = Z.gen()
     
     ret = []
-
-    if debug:
-      print "previous codewords:", prev, len(prev[0])
 
     d = Qpoly.degree(y)
     r = 0
     while true:
       r += 1
-      Qtest = Qpoly.quo_rem(x)
+      division_results = Qpoly.quo_rem(x)
 
       #what does "find the largest integer r for which Q(x,y)/x^r is still a (bivariate) polynomial" mean?
       #following ifs are all interpretations, none of them work exactly correct
 
-      if Qtest[0] != 0 and Qtest[1].degree(y) < 1:
-      # if Qtest[0] != 0 and Qtest[1] == 0:
+      # if Qtest[0] != 0 and Qtest[1].degree(y) < 1:
+      if division_results[0] != 0 and division_results[1] == 0:
       # if Qtest[0] != 0 and Qtest[0].degree(y) == d:
-        Qpoly = Qtest[0]
+        Qpoly = division_results[0]
         if debug:
-          print " division with x^"+str(r),Qtest
+          print " division with x^"+str(r),division_results
       else:
         if debug:
-          print "division end at r="+str(r)+": ", Qtest, Qtest[1].degree(y)
+          print "division end at r="+str(r)+": ", division_results, division_results[1].degree(y)
         break
 
-
-    Qtest = Qpoly(0,y)
     
-    if debug:
-      print "poly to find roots in:", Qtest
+    #evaluate polynomial with x=0. and convert to univariate
+    M = Z(Qpoly(x=0))
 
-    #convert to univariate
-    M = sum([Qtest.monomial_coefficient(y^d)*z^d for d in range(Qtest.degree(y)+1)])
+    if debug:
+      print "poly to find roots in:", M
+
     #iterate over roots
     if M == 0:
       return ret
     for (root,_) in M.roots():
-      if debug:
-        print "found root at pos "+str(i)+":", root
-
       #add root to list of roots that represent a polynomial
       tmpprev = [j+[root] for j in prev]
+
+      if debug:
+        print "found root at pos "+str(i)+":", root, " :", tmpprev
+
       if i < self._rank-1:
-        Qpoly = Qpoly(x,x*y+root)
         #recursive calling into rank depth 
-        ret += self._reconstruct(Qpoly,i+1,tmpprev)
+        ret += self._reconstruct(Qpoly(y=x*y+root),i+1,tmpprev)
       else:
         ret += tmpprev
     
@@ -497,21 +497,21 @@ def extension_poly_print(base_ring, poly, nl=True):
   if nl:
     print
 
-##### simple example, guruswami sudan ran with parameters t,1,1
+##### simple example
 # RS1 = ReedSolomonCode(7, 3, GF(13), alphas=[2,3,4,5,6,7,8])
 # print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
 # msg = vector(GF(13),[5,6,1])
 # cw = RS1.encode(msg)
-# error = vector(GF(13),[1,0,0,1,0,0,0])
+# error = vector(GF(13),[1,0,0,1,0,1,0])
 # received = cw + error
 # # print received
 # # print RS1.eval_encode(msg)
 
-# print "bw decode, no error:\n",RS1.bw_decode(cw)
+# # print "bw decode, no error:\n",RS1.bw_decode(cw)
 # print "bw decode, error(s):\n",RS1.bw_decode(received)
-# print "eea decode, no error:\n",RS1.eea_decode(cw)
+# # print "eea decode, no error:\n",RS1.eea_decode(cw)
 # print "eea decode, error(s):\n",RS1.eea_decode(received)
-# for ip in ["book","knh"]:
+# for ip in ["knh","book"]:
 #   for root in ["simple","book","roth"]:
 #     print "gs decode("+ip+","+root+"), error(s):\n",RS1.gs_decode(received, interpolate=ip, roots=root)
 
@@ -519,6 +519,8 @@ def extension_poly_print(base_ring, poly, nl=True):
 
 # F.<a> = GF(16)
 # alphas = [a^i for i in range(0,15)]
+# for i,alpha in enumerate(alphas):
+#   print "a^"+str(i), "=", alpha
 
 # RS2 = ReedSolomonCode(int(15),int(7),F,alphas)
 # # msg = vector(F,[a^5,a^2,0])
@@ -529,7 +531,11 @@ def extension_poly_print(base_ring, poly, nl=True):
 # print msg
 # # print "bw decode, error(s):\n",RS2.bw_decode(received)
 # # print "eea decode, error(s):\n",RS2.eea_decode(received)
-# print "gs decode, error(s):\n",RS2.gs_decode(received, tau=5, s=4, l=4)
+
+# for ip in ["book","knh"]:
+#   for root in ["simple","book","roth"]:
+#     decoded = RS2.gs_decode(received, tau=5, s=4, l=6, interpolate=ip, roots=root)
+#     print "gs decode("+ip+","+root+"), error(s):\n", decoded
 
 # Roth paper example: http://www.cs.technion.ac.il/~ronny/PUB/rs.pdf
 
@@ -552,18 +558,21 @@ def extension_poly_print(base_ring, poly, nl=True):
 # Qpoly += (14 + 13*x + x*2)*y^2  
 # Qpoly += (2 + 11*x + x^2)*y^3  
 # Qpoly += 17*y^4
-# print RS3._find_roots(Qpoly)
-# print RS3._find_roots_book(Qpoly)
-# print RS3._find_roots_roth(Qpoly)
+# print Qpoly
+# print "root finding for Q polynomial (simple), :\n",RS3._find_roots(Qpoly)
+# print "root finding for Q polynomial (book), :\n",RS3._find_roots_book(Qpoly)
+# print "root finding for Q polynomial (roth), :\n",RS3._find_roots_roth(Qpoly)
+
 
 # Qpoly =  8 +        12*x^2 + 9*x^3 + 8*x^4
 # Qpoly += (5 + 14*x + 7*x^2 + 15*x^3 + 4*x^4)*y  
 # Qpoly += (12 + 12*x + 15*x*2 + 4*x^3)*y^2  
 # Qpoly += (9 + 10*x + 14*x^2)*y^3  
 # Qpoly += (13+x)*y^4
-# print RS3._find_roots(Qpoly)
-# print RS3._find_roots_book(Qpoly)
-# print RS3._find_roots_roth(Qpoly)
+# print Qpoly
+# print "root finding for Q polynomial (simple), :\n",RS3._find_roots(Qpoly)
+# print "root finding for Q polynomial (book), :\n",RS3._find_roots_book(Qpoly)
+# print "root finding for Q polynomial (roth), :\n",RS3._find_roots_roth(Qpoly)
 
 
 
