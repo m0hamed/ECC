@@ -90,10 +90,89 @@ def bisect(fun, x, lo, hi, eps=0.5):
     return mid
 
 
+def plot_linear_code_test(F,n,k,tests):
+  results = test_decode(F,k, n, tests)
+  X = range(1,n+1)
+
+  fig = plt.figure()
+
+  ax = plt.gca()
+  ax.spines['top'].set_visible(False)
+  ax.spines['right'].set_visible(False)
+
+  plt.title("Random (%d,%d,%d) code in F_%d." % (n,k,results[0].minimum_distance(),F.order()))
+  plt.plot(X, results[1], label='Nearest Neighbor')
+  plt.plot(X, results[2], label='Syndrome')
+  plt.legend()
+  plt.ylabel("Successful Decoding (%)")
+  plt.xlabel("Number of errors")
+  fig.savefig('decodeTester%d-%d-%d-F_%d.pdf'% (n,k,results[0].minimum_distance(),F.order()))
+  plt.close(fig)
+
+def plot_hamming_test(F,hamming_m,tests,crossovers):
+  HC = HammingCode(hamming_m, F)
+  NC = NoCode(F, HC._rank)
+
+  NC_bit_error_rates = []
+  HC_bit_error_rates = []
+  NC_block_error_rates = []
+  HC_block_error_rates = []
+
+  for crossover in crossovers:
+    Ch1 = QarySymmetricChannel(NC,NC.decode,NC.unencode,crossover/float(100))
+    NC_results = Ch1.transmit(tests)
+    NC_bit_error_rates += [NC_results[0]*100]
+    NC_block_error_rates += [NC_results[1]*100]
+    Ch2 = QarySymmetricChannel(HC,HC.decode,HC.unencode,crossover/float(100))
+    HC_results = Ch2.transmit(tests)
+    HC_bit_error_rates += [HC_results[0]*100]
+    HC_block_error_rates += [HC_results[1]*100]
+
+
+
+  fig = plt.figure()
+
+  ax = plt.gca()
+  plt.axis('equal')
+  ax.spines['top'].set_visible(False)
+  ax.spines['right'].set_visible(False)
+
+  plt.title("%dth Hamming code (%d,%d) in F_%d vs No code" % (hamming_m,HC._length,HC._rank,F.order()))
+  plt.plot(crossovers, NC_bit_error_rates, label='No Code')
+  plt.plot(crossovers, HC_bit_error_rates, label='4th Hamming Code')
+  plt.legend(loc=4)
+  plt.ylabel("Bit error rate (%)")
+  plt.xlabel("Qary channel crossover probability (%)")
+  fig.savefig('%dhammingVsNone-F_%d-bit.pdf'% (hamming_m,F.order()))
+  plt.close(fig)
+
+  fig = plt.figure()
+
+  ax = plt.gca()
+  ax.spines['top'].set_visible(False)
+  ax.spines['right'].set_visible(False)
+
+  plt.title("%dth Hamming code (%d,%d) in F_%d vs No code" % (hamming_m,HC._length,HC._rank,F.order()))
+  plt.plot(crossovers, NC_block_error_rates, label='No Code')
+  plt.plot(crossovers, HC_block_error_rates, label='4th Hamming Code')
+  plt.legend(loc=4)
+  plt.ylabel("Block error rate (%)")
+  plt.xlabel("Qary channel crossover probability (%)")
+  fig.savefig('%dhammingVsNone-F_%d-block.pdf'% (hamming_m,F.order()))
+  plt.close(fig)
+
 if __name__ == "__main__":
   #plot_singleton_bound()
   #plot_plotkin_bound()
   #plot_griesmer_bound()
   #plot_hamming_bound()
   #plot_gilbert_varshamov_bound()
+
+  # F.<a> = GF(2)
+  # plot_linear_code_test(F,10,3,1000)
+
+  # F.<a> = GF(7)
+  #crossovers = range(1,16,1)
+  #plot_hamming_test(F,2000,2)
+
   pass
