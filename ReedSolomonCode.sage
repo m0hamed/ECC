@@ -159,27 +159,27 @@ class ReedSolomonCode(BasicLinearCode):
     # matrix for the linear equations
     m = []
     for alpha, rec in zip(self.alphas, received_word):
-      # row of linear equations for each alpha and received word element
-      row = []
-      # a goes up to and including l
-      for a in xrange(l+1):
-        # b goes up to and including l_a
-        for b in xrange(s*(self._length - tau) - a*(self._rank - 1) - 1 + 1):
-          # the coefficent of Q_ab
-          coeff = 0
-          # h goes up to and including a but excluding s
-          for h in xrange(min(s, a + 1)):
-            # r goes up to and including b but excluding s-h
-            for r in xrange(min(s-h, b + 1)):
-              coeff += binomial(a,h)*binomial(b,r)*(rec^(a-h))*(alpha^(b-r))
-          row.append(coeff)
-      m.append(row)
+      # h goes up to but excluding s
+      for h in xrange(s):
+        # r goes up to but excluding s-h
+        for r in xrange(s-h):
+          # row of coefficients representing a linear equation
+          row = []
+          # a goes up to and including l
+          for a in xrange(l+1):
+            # b goes up to and including l_a
+            for b in xrange(s*(self._length - tau) - a*(self._rank - 1) - 1 + 1):
+              # the coefficent of Q_ab
+              coeff = 0
+              # coeff is not 0 if condition met
+              if a >= h and b >= r:
+                coeff = binomial(a,h)*binomial(b,r)*(rec^(a-h))*(alpha^(b-r))
+              row.append(coeff)
+          m.append(row)
     # make a sage matrix out of it
     m = matrix(self._base_ring, m)
-    #pdb.set_trace()
     # get one of the rows of the right kernel matrix as a list (polynomial coefficients)
-
-    Qlist = list(m.right_kernel_matrix()[0])
+    Qlist = list(m.right_kernel_matrix()[-1])
     #print Qlist, len(Qlist)
     # convert coefficients into sage polynomial
     return self._make_poly(Qlist, tau, s, l)
@@ -265,7 +265,7 @@ class ReedSolomonCode(BasicLinearCode):
     #multivariate polynomial ring over GF(q), for the Qpoly
     R.<x,y> = self._base_ring[]
     #univariate polynomial ring over GF(q), for operation of coefficients of y^i in the multivariate polynomial
-    
+
     # Z.<z> = self._base_ring[]
     Z = PolynomialRing(self._base_ring, 'x')
     z = Z.gen()
@@ -295,9 +295,9 @@ class ReedSolomonCode(BasicLinearCode):
         if xc != 0:
           print "  (", xc, ") * y^", str(i)
 
-    #convert each list element from a multivariate polynomial to a univariate polynomial 
+    #convert each list element from a multivariate polynomial to a univariate polynomial
     # y_coefficients = [sum([poly.monomial_coefficient(x^d)*z^d for d in range(poly.degree(x)+1)]) for poly in y_coefficients]
-    
+
     # if debug:
     #   print "Qpoly coefficients of y^i, converted to univariate polynomials:"
     #   for i,xc in enumerate(y_coefficients):
@@ -376,7 +376,7 @@ class ReedSolomonCode(BasicLinearCode):
 
     Z = PolynomialRing(self._base_ring, 'y')
     z = Z.gen()
-    
+
     ret = []
 
     d = Qpoly.degree(y)
@@ -398,7 +398,7 @@ class ReedSolomonCode(BasicLinearCode):
         if debug:
           print "division end at r="+str(r)+": ", division_results, division_results[1].degree(y)
         break
-    
+
     #evaluate polynomial with x=0. and convert to univariate
     M = Z(Qpoly(x=0))
 
@@ -417,7 +417,7 @@ class ReedSolomonCode(BasicLinearCode):
 
       if i < self._rank-1:
         M_new = Qpoly(y=x*y+root)
-        #recursive calling into rank depth 
+        #recursive calling into rank depth
         ret += self._reconstruct(M_new,i+1,tmpprev)
       else:
         ret += tmpprev
