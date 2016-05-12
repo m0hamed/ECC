@@ -43,7 +43,6 @@ class HammingCode(BasicLinearCode):
     # put all the vectors in a matrix
     A = matrix(self._base_ring,(gen_rows));
 
-<<<<<<< HEAD
     #create the generator and parity check matrices
     #generator matrix will be in echelon form by adding an identity matrix an the beginning
     self._generator_matrix = matrix.identity(self._base_ring,self._rank).augment(A)
@@ -75,24 +74,6 @@ class HammingCode(BasicLinearCode):
         return False
       div = divNew
     return True
-=======
-    #untested, unbased, completely derivative determination of table (-A^T)
-    # its tested now, but the rest is still true :)
-    for i in range(0,m-1):
-      base = ([0]*(i))+([1]*(length-rank-i))
-      while True:
-        gen_rows.insert(0,copy(base))
-        if not next_permutation(base):
-          break
-    A = matrix(GF(2),(gen_rows));
-
-    self._generator_matrix = matrix(GF(2),matrix.identity(rank).augment(A))
-    self._parity_check_matrix = A.transpose().augment(matrix.identity(length-rank))
-    self._base_ring = GF(2)
-    self._rank, self._length = self._generator_matrix.dimensions()
-    self._syndrome_dict = None
-    self._codewords = None
->>>>>>> 7dfd68832e017bd2d176a6474f5bdc0efa2eb9ef
 
   def parity_check_matrix(self):
     return self._parity_check_matrix
@@ -103,7 +84,6 @@ class HammingCode(BasicLinearCode):
   def encode(self,msg):
     #for binary Hamming codes, we can calculate parity bits directly by adding the correct message bits
     if self._base_ring == GF(2):
-      print self._base_ring
       msg = list(msg)
       paritybits = self._calculate_parity(msg)
 
@@ -126,7 +106,7 @@ class HammingCode(BasicLinearCode):
 
   #decodes only binary Hamming codes, through the syndrome of the received word
   def decode(self,word):
-    
+    word = self.get_vector(word)
     #for binary codes, we can check the message correctness faster by generating the parity bits, and comparing them to the received ones
     if self._base_ring == GF(2) and self.is_codeword_binary(word):
       return word
@@ -134,7 +114,6 @@ class HammingCode(BasicLinearCode):
     parity_matrix_transposed = self._parity_check_matrix.transpose()
 
     syndrome = word*parity_matrix_transposed
-    print "Syndrome",syndrome;
     #if the syndrome is the zero vector, then it is a correct codeword (check applies only to qary Hamming codes)
     if syndrome == 0:
       return word
@@ -149,7 +128,6 @@ class HammingCode(BasicLinearCode):
       [incorrect_message_pos] = [i for i,x in enumerate(parity_matrix_transposed) if self._are_linearly_dependant(x,syndrome)]
       # get position of first non zero element in list
       i = next((i for i, x in enumerate(syndrome) if x), None)
-      print i, incorrect_message_pos, syndrome[i].quo_rem(parity_matrix_transposed[incorrect_message_pos,i])[0]
       word[incorrect_message_pos] -= syndrome[i].quo_rem(parity_matrix_transposed[incorrect_message_pos,i])[0]
       
       return word
@@ -165,14 +143,14 @@ class HammingCode(BasicLinearCode):
     return False
     
 #test of hamming generation
-m = 2
+# m = 2
 
-F.<a> = GF(9)
-h = HammingCode(m, F)
-print "m=", m, ", Hamming(", h._rank,",", h._length, ")"
-print F.list()
-print "Generator:\n", h._generator_matrix.str()
-print "Parity:\n", h._parity_check_matrix
+# F.<a> = GF(9)
+# h = HammingCode(m, F)
+# print "m=", m, ", Hamming(", h._rank,",", h._length, ")"
+# print F.list()
+# print "Generator:\n", h._generator_matrix.str()
+# print "Parity:\n", h._parity_check_matrix
 
 # binaries = list(itertools.product([0, 1], repeat=h._rank))
 
