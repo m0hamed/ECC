@@ -159,26 +159,27 @@ class ReedSolomonCode(BasicLinearCode):
     # matrix for the linear equations
     m = []
     for alpha, rec in zip(self.alphas, received_word):
-      # row of linear equations for each alpha and received word element
-      row = []
-      # a goes up to and including l
-      for a in xrange(l+1):
-        # b goes up to and including l_a
-        for b in xrange(s*(self._length - tau) - a*(self._rank - 1) - 1 + 1):
-          # the coefficent of Q_ab
-          coeff = 0
-          # h goes up to and including a but excluding s
-          for h in xrange(min(s, a + 1)):
-            # r goes up to and including b but excluding s-h
-            for r in xrange(min(s-h, b + 1)):
-              coeff += binomial(a,h)*binomial(b,r)*(rec^(a-h))*(alpha^(b-r))
-          row.append(coeff)
-      m.append(row)
+      # h goes up to but excluding s
+      for h in xrange(s):
+        # r goes up to but excluding s-h
+        for r in xrange(s-h):
+          # row of coefficients representing a linear equation
+          row = []
+          # a goes up to and including l
+          for a in xrange(l+1):
+            # b goes up to and including l_a
+            for b in xrange(s*(self._length - tau) - a*(self._rank - 1) - 1 + 1):
+              # the coefficent of Q_ab
+              coeff = 0
+              # coeff is not 0 if condition met
+              if a >= h and b >= r:
+                coeff = binomial(a,h)*binomial(b,r)*(rec^(a-h))*(alpha^(b-r))
+              row.append(coeff)
+          m.append(row)
     # make a sage matrix out of it
     m = matrix(self._base_ring, m)
-    #pdb.set_trace()
     # get one of the rows of the right kernel matrix as a list (polynomial coefficients)
-    Qlist = list(m.right_kernel_matrix()[0])
+    Qlist = list(m.right_kernel_matrix()[-1])
     #print Qlist, len(Qlist)
     # convert coefficients into sage polynomial
     return self._make_poly(Qlist, tau, s, l)

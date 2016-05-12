@@ -79,7 +79,7 @@ def bisect(fun, x, lo, hi, eps=0.5):
   if lo > hi:
     return -1
   mid = (lo+hi)/2
-  print float(lo), float(mid), float(hi), float(mid-lo), fun(mid)
+  #print float(lo), float(mid), float(hi), float(mid-lo), fun(mid)
   if mid-lo < eps:
     return mid
   if fun(mid) > x:
