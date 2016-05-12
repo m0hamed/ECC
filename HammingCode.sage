@@ -43,6 +43,7 @@ class HammingCode(BasicLinearCode):
     # put all the vectors in a matrix
     A = matrix(self._base_ring,(gen_rows));
 
+<<<<<<< HEAD
     #create the generator and parity check matrices
     #generator matrix will be in echelon form by adding an identity matrix an the beginning
     self._generator_matrix = matrix.identity(self._base_ring,self._rank).augment(A)
@@ -74,6 +75,24 @@ class HammingCode(BasicLinearCode):
         return False
       div = divNew
     return True
+=======
+    #untested, unbased, completely derivative determination of table (-A^T)
+    # its tested now, but the rest is still true :)
+    for i in range(0,m-1):
+      base = ([0]*(i))+([1]*(length-rank-i))
+      while True:
+        gen_rows.insert(0,copy(base))
+        if not next_permutation(base):
+          break
+    A = matrix(GF(2),(gen_rows));
+
+    self._generator_matrix = matrix(GF(2),matrix.identity(rank).augment(A))
+    self._parity_check_matrix = A.transpose().augment(matrix.identity(length-rank))
+    self._base_ring = GF(2)
+    self._rank, self._length = self._generator_matrix.dimensions()
+    self._syndrome_dict = None
+    self._codewords = None
+>>>>>>> 7dfd68832e017bd2d176a6474f5bdc0efa2eb9ef
 
   def parity_check_matrix(self):
     return self._parity_check_matrix
