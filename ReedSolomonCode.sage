@@ -28,6 +28,9 @@ class ReedSolomonCode(BasicLinearCode):
     self._parity_check_matrix = None
     self._gammas = None
 
+  def minimum_distance(self):
+    return self._min_dist
+
   def _get_gammas(self):
     if (self._gammas is None):
       self._gammas = [
@@ -82,21 +85,30 @@ class ReedSolomonCode(BasicLinearCode):
     return tau, s, l
 
   # Guruswami-sudan decoding algorithm
-  def gs_decode(self, received_word, tau=None, s=None, l=None, interpolate="knh", roots="simple"):
+  def gs_decode(self, received_word, tau=None, s=None, l=None, interpolate="knh", roots="simple", timing=False):
+
     if tau is None or s is None or l is None:
       tau, s, l = self._get_decode_params(tau)
-    print "using tau=%i, s=%i, l=%i" % (tau, s, l)
+
+    # print "using tau=%i, s=%i, l=%i" % (tau, s, l)
     # get interpolation polynomial
+    if timing:
+      start = time.clock()
     if interpolate == "knh":
       Qpoly = self._knh_interpolate(received_word, tau, s, l)
     elif interpolate == "book":
       Qpoly = self._interpolate(received_word, tau, s, l)
     else:
       return None
+    if timing:
+      end = time.clock()
+      interpolation_time = end-start
 
-    print Qpoly
+    # print Qpoly
 
     # find roots
+    if timing:
+      start = time.clock()
     if roots == "simple":
       words = self._find_roots(Qpoly)
     elif roots == "book":
@@ -105,6 +117,9 @@ class ReedSolomonCode(BasicLinearCode):
       words = self._find_roots_roth(Qpoly)
     else:
       return None
+    if timing:
+      end = time.clock()
+      root_finding_time = end-start
 
     # print "decode results:", words
 
@@ -116,7 +131,11 @@ class ReedSolomonCode(BasicLinearCode):
     # return only the words whose codewords are in the required distance range
 
     # print "distances:", [self.distance(self.eval_encode(word),received_word) for word in words]
-    return [word for word in words if self.distance(self.eval_encode(word),received_word) <= tau]
+    results = [word for word in words if self.distance(self.eval_encode(word),received_word) <= tau]
+
+    if timing:
+      return (results, interpolation_time, root_finding_time)
+    return results
 
   def _check_multiplicity(self, poly, encoded_word, s):
     for alpha, enc in zip(self.alphas, encoded_word):
@@ -445,7 +464,7 @@ class ReedSolomonCode(BasicLinearCode):
     # get the quotient from the division, (should do some failure checking here)
     g, _ = (-Q0x).quo_rem(Q1x)
     # return the coefficients padded with 0s when needed
-    return g.padded_list(self._rank)
+    return self.get_vector(g.padded_list(self._rank))
 
   # Peterson algorithm decoding through the Extended Euclidean Algorithm
   # works up to lagrange interpolation, fails horribly there
@@ -455,6 +474,7 @@ class ReedSolomonCode(BasicLinearCode):
 
     #generate the syndrome polynomial
     PF.<x> = self._base_ring[]
+
     syndrome_polynomial = sum([syndromes[self._t*2-1-i]*x^i for i in range(self._t*2)])
     #run the extended euclidean algorithm between x^2t and the syndrome polynomial, up to the first iteration where the degree of the remainder is less than t
     eea_results = EEA(x^(2*self._t),syndrome_polynomial,self._t)
@@ -549,14 +569,16 @@ def extension_poly_print(base_ring, poly, nl=True):
   if nl:
     print
 
+
 ##### simple example
-# RS1 = ReedSolomonCode(7, 3, GF(13), alphas=[2,3,4,5,6,7,8])
+# RS1 = ReedSolomonCode(7, 3, GF(13))
 # print "n:",RS1._length,", k:",RS1._rank,", t:",RS1._t
 # msg = vector(GF(13),[5,6,1])
 # cw = RS1.encode(msg)
+# print cw
 # error = vector(GF(13),[1,0,0,1,0,1,0])
 # received = cw + error
-# # print received
+# print received
 # # print RS1.eval_encode(msg)
 
 # # print "bw decode, no error:\n",RS1.bw_decode(cw)
@@ -585,7 +607,7 @@ def extension_poly_print(base_ring, poly, nl=True):
 # # print "eea decode, error(s):\n",RS2.eea_decode(received)
 
 # for ip in ["book","knh"]:
-#   for root in ["simple","book","roth"]:
+#   for root in ["simple","roth"]:
 #     decoded = RS2.gs_decode(received, tau=5, s=4, l=6, interpolate=ip, roots=root)
 #     print "gs decode("+ip+","+root+"), error(s):\n", decoded
 
