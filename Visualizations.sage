@@ -131,13 +131,15 @@ def transmit_over_codes(tests,crossovers,codes):
         code["root_finding"] += results[2][2]
       else:
         code["decoding_time"] += results[2]
-
   for code in codes:
+
     print "Average decoding time for %s: %f sec"%(code["name"],code["decoding_time"]/float(len(crossovers)))
     if code["interpolation"] > 0:
-      print "Average interpolation time for %s: %f sec"%(code["name"],code["interpolation"]/float(len(crossovers)))
+      code["interpolation"] = code["interpolation"]/float(len(crossovers))
+      print "Average interpolation time for %s: %f sec"%(code["name"],code["interpolation"])
     if code["root_finding"] > 0:
-      print "Average root finding time for %s: %f sec"%(code["name"],code["root_finding"]/float(len(crossovers)))
+      code["root_finding"] = code["root_finding"]/float(len(crossovers))
+      print "Average root finding time for %s: %f sec"%(code["name"],code["root_finding"])
 
 def plot_codes(tests,crossovers,codes,title,filename,y_axis="bit_error_rates"):
 
@@ -196,18 +198,39 @@ def plot_reed_solomon_different_rates():
   plot_codes(1000,crossovers,[RS1_desc,RS2_desc,RS3_desc],"Reed Solomon Simulation","rssim_3.pdf",y_axis="block_error_rates")
 
 def guruswami_sudan_timing_simulation():
-  F.<a> = GF(13)
-  length = 11
+  F.<a> = GF(11)
   rank = 5
-  crossovers = [10]
-  RS1 = ReedSolomonCode(length, rank, F)
-  codes = []
-  codes.append({"code":RS1, "name":("(%d,%d,%d) RS code in F_%d(EEA)" % (RS1._length,RS1._rank,RS1._min_dist,F.order())), "decode":RS1.eea_decode, "unencode":None})
-  codes.append({"code":RS1, "name":("(%d,%d,%d) RS code in F_%d(BW)" % (RS1._length,RS1._rank,RS1._min_dist,F.order())), "decode":RS1.bw_decode, "unencode":None})
+  lengths = [8,10]
+  ranks = [5,7]
+
+  interpolation = {}
   for ip in ["knh","book"]:
-    for root in ["simple","book","roth"]:
-      codes.append({"code":RS1, "name":("(%d,%d,%d) RS code in F_%d(GS,%s,%s)" % (RS1._length,RS1._rank,RS1._min_dist,F.order(),ip,root)), "decode":lambda x: RS1.gs_decode(x, interpolate=ip, roots=root, timing=True), "unencode":None})
-  transmit_over_codes(10,crossovers,codes)
+    interpolation[ip]=[0]*len(lengths)
+  root_finding = {}
+  for root in ["simple","book","roth"]:
+    root_finding[root]=[0]*len(lengths)
+  for i, (length, rank) in enumerate(zip(lengths,ranks)):
+    crossovers = [10]
+    RS1 = ReedSolomonCode(length, rank, F)
+    print RS1._get_decode_params()
+    codes = []
+    # codes.append({"code":RS1, "name":("(%d,%d,%d) RS code in F_%d(EEA)" % (RS1._length,RS1._rank,RS1._min_dist,F.order())), "decode":RS1.eea_decode, "unencode":None})
+    # codes.append({"code":RS1, "name":("(%d,%d,%d) RS code in F_%d(BW)" % (RS1._length,RS1._rank,RS1._min_dist,F.order())), "decode":RS1.bw_decode, "unencode":None})
+
+    for ip in ["knh","book"]:
+      for root in ["simple","book","roth"]:
+        decoding_function = lambda x, _ip=ip, _root=root: RS1.gs_decode(x, interpolate=_ip, roots=_root, timing=True)
+        codes.append({"code":RS1, "name":("(%d,%d,%d) RS code in F_%d(GS,%s,%s)" % (RS1._length,RS1._rank,RS1._min_dist,F.order(),ip,root)), "decode":decoding_function, "unencode":None, "ip":ip, "root":root})
+    transmit_over_codes(50,crossovers,codes)
+    for code in codes:
+      for ip in ["knh","book"]:
+        for root in ["simple","book","roth"]:
+          if code["ip"] == ip and code["root"] == root:
+            interpolation[ip][i] += code["interpolation"]/float(3)
+            root_finding[root][i] += code["root_finding"]/float(2)
+
+  print interpolation
+  print root_finding
 
 if __name__ == "__main__":
   #plot_singleton_bound()
@@ -221,7 +244,8 @@ if __name__ == "__main__":
 
   # plot_hamming_vs_none()
 
+  #guruswami_sudan_timing_simulation()
 
   pass
 
-guruswami_sudan_timing_simulation()
+
